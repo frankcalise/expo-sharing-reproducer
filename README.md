@@ -8,6 +8,47 @@ A minimal app that reproduces three `expo-sharing` share-into issues on Android.
 - `src/repro/flags.ts` + a `clearEarly` switch on the Home tab (bug 1 trigger)
 - the `expo-sharing` config plugin in `app.json`
 
+## At a glance
+
+All screenshots come from a Pixel 9 Pro (Android API 37) running a release build. The shared
+image is a synthetic gradient. Click a thumbnail for the full-size image.
+
+### Bug 1: `useIncomingShare` reports a share that native has already cleared
+
+The strong form: `clearSharedPayloads()` runs in a `useLayoutEffect` before the hook's mount effect.
+
+| 1. Share from Chrome with `clearEarly` on | 2. Background → foreground |
+| :-: | :-: |
+| <a href="repro/bug1-strong-clearEarly-chrome.png"><img src="repro/bug1-strong-clearEarly-chrome.png" width="260"></a> | <a href="repro/bug1-strong-after-bg-fg.png"><img src="repro/bug1-strong-after-bg-fg.png" width="260"></a> |
+| **MISMATCH**: native is `[]`, but the hook still has the Chrome payload. `resolvedSharedPayloads` stays `[]`, with `isResolving: false` and `error: null`. | **Still MISMATCH.** The hook never recovers, and the share never resolves. |
+
+The weak form: the hook's own `clearSharedPayloads()`.
+
+| 1. Shared from Photos, before clearing | 2. After `hook.clearSharedPayloads()` | 3. Background → foreground |
+| :-: | :-: | :-: |
+| <a href="repro/photos-warm-A.png"><img src="repro/photos-warm-A.png" width="220"></a> | <a href="repro/bug1-weak-after-hook-clear.png"><img src="repro/bug1-weak-after-hook-clear.png" width="220"></a> | <a href="repro/bug1-weak-after-bg-fg.png"><img src="repro/bug1-weak-after-bg-fg.png" width="220"></a> |
+| In sync. | **MISMATCH**: native is cleared, but hook state is unchanged. | In sync again, but only because AppState fired `active`. |
+
+### Bug 2: `contentUri` is `file:/…` (single slash) and `originalName` is passed through as-is
+
+| Google Photos (warm) | Files by Google (warm, extensionless file) | Google Photos (cold start) |
+| :-: | :-: | :-: |
+| <a href="repro/photos-warm-B.png"><img src="repro/photos-warm-B.png" width="220"></a> | <a href="repro/files-warm-B-C.png"><img src="repro/files-warm-B-C.png" width="220"></a> | <a href="repro/photos-cold-A.png"><img src="repro/photos-cold-A.png" width="220"></a> |
+| `file:/data/user/0/…/repro_test.jpg`. **Both** the raw and `file:///` `<Image>` load, and `fetch()` returns 200 for both. | Single slash, and `originalName: "repro_noext_test"` with no extension. Both images load. | The same single-slash `contentUri` after a cold start. |
+
+The single slash is non-canonical, but on this device it did **not** break expo-image or `fetch`.
+
+### Bug 3: clearing before or during resolve returns `[]` with no error
+
+| Action (a payload was present beforehand) | Result |
+| --- | --- |
+| `clearSharedPayloads()`, then `await getResolvedSharedPayloadsAsync()` | resolves `[]` |
+| `getResolvedSharedPayloadsAsync()` started, then `clearSharedPayloads()` called immediately | resolves `[]` |
+| `<Image>` of the raw `content://` value after the clear | loads (bottom of the Files screenshot above) |
+| `fetch()` of the raw `content://` value after the clear | `fetch failed: Call to function 'NativeRequest.start' has been rejected.` (probably unrelated, see below) |
+
+The exact log lines for every run are in [`repro/log.txt`](repro/log.txt).
+
 ## Versions
 
 | package          | version      |
