@@ -1,36 +1,15 @@
-# On-screen log lines (also mirrored to logcat, tag ReactNativeJS, prefix [repro]).
-# Device: Pixel 9 Pro, Android API 37, release build. Times are UTC.
+# [repro] lines from logcat (adb logcat -s ReactNativeJS), Pixel 9 Pro, Android API 37, release build. Times UTC.
+# STATE lines mirror the screen: native = getSharedPayloads(), hook = useIncomingShare().
 
-## Run 1: warm share from Google Photos (repro_test.jpg), clearEarly=OFF
-20:49:44.099 B[0] Image(file:///) onLoad
-20:49:44.118 B[0] Image(raw) onLoad
-20:49:58.419 B[0] fetch(raw) status=200
-20:49:58.446 B[0] fetch(file:///) status=200
-20:50:07.260 hook.clearSharedPayloads() called
-  -> MISMATCH banner: native [] but hook.sharedPayloads has 1   (bug1-weak-after-hook-clear.png)
-  -> after HOME + relaunch (AppState active): hook state = {"sharedPayloads": [],"resolvedSharedPayloads": [], ...}  (bug1-weak-after-bg-fg.png)
+## Weak form: share from Chrome (clearEarly off) → hook.clearSharedPayloads() → background → foreground
+21:14:32.270 STATE native=[{"mimeType":"image/jpeg","shareType":"image","value":"content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}] hook={"sharedPayloads": [{"mimeType": "image/jpeg","shareType": "image","value": "content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}],"resolvedSharedPayloads": [],"isResolving": false,"error": null}
+21:14:32.274 STATE native=[{"mimeType":"image/jpeg","shareType":"image","value":"content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}] hook={"sharedPayloads": [{"mimeType": "image/jpeg","shareType": "image","value": "content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}],"resolvedSharedPayloads": [],"isResolving": true,"error": null}
+21:14:32.286 STATE native=[{"mimeType":"image/jpeg","shareType":"image","value":"content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}] hook={"sharedPayloads": [{"mimeType": "image/jpeg","shareType": "image","value": "content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}],"resolvedSharedPayloads": [{"originalName": "1792012468410249746124723692930.jpg","mimeType": "image/jpeg","shareType": "image","contentType": "image","contentSize": 15395,"contentUri": "file:/data/user/0/dev.repro.expo_sharing/cache/1792012468410249746124723692930.jpg","contentMimeType": "image/jpeg","value": "content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}],"isResolving": false,"error": null}
+21:14:38.911 hook.clearSharedPayloads() called
+21:14:38.921 STATE native=[] hook={"sharedPayloads": [{"mimeType": "image/jpeg","shareType": "image","value": "content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}],"resolvedSharedPayloads": [{"originalName": "1792012468410249746124723692930.jpg","mimeType": "image/jpeg","shareType": "image","contentType": "image","contentSize": 15395,"contentUri": "file:/data/user/0/dev.repro.expo_sharing/cache/1792012468410249746124723692930.jpg","contentMimeType": "image/jpeg","value": "content://com.android.chrome.FileProvider/images/screenshot/1792012468410249746124723692930.jpg"}],"isResolving": false,"error": null}
+21:14:44.317 STATE native=[] hook={"sharedPayloads": [],"resolvedSharedPayloads": [],"isResolving": false,"error": null}
 
-## Run 2: warm share from Files by Google (repro_noext_test), clearEarly=OFF
-20:50:44.756 B[0] Image(raw) onLoad
-20:50:44.758 B[0] Image(file:///) onLoad
-20:51:01.997 B[0] fetch(raw) status=200
-20:51:02.025 B[0] fetch(file:///) status=200
-20:51:03.544 C1 clearSharedPayloads() done; awaiting getResolvedSharedPayloadsAsync()
-20:51:03.556 C1 clear → resolve RESOLVED: []
-20:51:06.119 C3 clearSharedPayloads(); probing raw value content://com.google.android.apps.nbu.files.provider/2/1000007773
-20:51:06.141 C3 fetch(raw) ERROR: Error: fetch failed: Call to function 'NativeRequest.start' has been rejected.
-20:51:06.176 C3 Image(raw) onLoad
-
-## Run 3: re-share from Files by Google, clearEarly=OFF (payload present before tapping)
-20:51:51.851 C2 started resolve, then clearSharedPayloads() immediately
-20:51:51.863 C2 resolve ∥ clear RESOLVED: []
-
-## Run 4: warm share from Chrome (long-press image → Share image), clearEarly=ON
-20:54:15.646 useLayoutEffect: clearSharedPayloads() (clearEarly=ON)
-STATE native=[] hook={"sharedPayloads": [{"mimeType": "image/jpeg","shareType": "image","value": "content://com.android.chrome.FileProvider/images/screenshot/1792011251402982102208628221092.jpg"}],"resolvedSharedPayloads": [],"isResolving": false,"error": null}
-  -> unchanged after HOME + relaunch (bug1-strong-after-bg-fg.png)
-
-## Run 5: cold share from Google Photos (app force-stopped), release build, clearEarly=OFF
-20:54:48.202 B[0] Image(raw) onLoad
-20:54:48.219 B[0] Image(file:///) onLoad
-  resolved contentUri: file:/data/user/0/dev.repro.expo_sharing/cache/repro_test.jpg
+## Strong form: share from Chrome (clearEarly on) → background → foreground (no new STATE line: nothing changed)
+21:15:11.557 useLayoutEffect: clearSharedPayloads() (clearEarly=ON)
+21:15:11.557 STATE native=[{"mimeType":"image/jpeg","shareType":"image","value":"content://com.android.chrome.FileProvider/images/screenshot/17920125072898712249931900855450.jpg"}] hook={"sharedPayloads": [{"mimeType": "image/jpeg","shareType": "image","value": "content://com.android.chrome.FileProvider/images/screenshot/17920125072898712249931900855450.jpg"}],"resolvedSharedPayloads": [],"isResolving": false,"error": null}
+21:15:12.579 STATE native=[] hook={"sharedPayloads": [{"mimeType": "image/jpeg","shareType": "image","value": "content://com.android.chrome.FileProvider/images/screenshot/17920125072898712249931900855450.jpg"}],"resolvedSharedPayloads": [],"isResolving": false,"error": null}
