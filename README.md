@@ -10,6 +10,45 @@ show the payload that native no longer has.
 
 This app is a minimal Expo SDK 58 (beta) app that shows both forms on Android.
 
+## Why this is a problem
+
+An app that follows the [Expo Router example](https://docs.expo.dev/versions/latest/sdk/sharing/#expo-router)
+in the documentation works like this:
+
+1. `+native-intent.ts` redirects to the share handler screen when the URL host is `expo-sharing`.
+2. The share handler screen reads the share from `useIncomingShare()`.
+3. The app calls `clearSharedPayloads()` after it uses the share.
+
+The documentation gives these two rules:
+
+- `useIncomingShare()` "updates the data if the shared payload has changed".
+- `getSharedPayloads()` "returns an empty array if no data has been shared with the app".
+
+After step 3, `getSharedPayloads()` returns `[]`. The hook still returns the old payload. The two
+documented APIs give different answers. For this reason, the share handler screen cannot use the
+hook to find out whether a share is pending.
+
+The result for each form:
+
+- **Weak form.** The screen shows a share that the app already cleared. Any logic that reads
+  `sharedPayloads` treats the cleared share as pending. This continues until the app goes to the
+  background and comes back.
+- **Strong form.** The hook reports one pending share, but the hook never resolves that share.
+  `resolvedSharedPayloads` stays `[]`, `isResolving` stays `false`, and `error` stays `null`. A
+  screen like the documentation example shows no content, no loading indicator, and no error. The
+  state does not recover. The source code shows that `refreshSharePayloads()` also does not
+  recover this state, because it uses the same comparison. This app did not test
+  `refreshSharePayloads()`.
+
+The strong form occurs when the app clears the payload after the hook first renders, but before
+the hook's first effect runs. A `useLayoutEffect` in the same component is one example.
+
+### Related documentation issue
+
+The Expo Router example imports `getSharedPayloads` but does not call it. The redirect checks only
+the URL host. The example does not show how to check that native has a payload before the app
+redirects.
+
 ## At a glance
 
 All screenshots come from a Pixel 9 Pro (Android API 37) with a release build. Each test shares
